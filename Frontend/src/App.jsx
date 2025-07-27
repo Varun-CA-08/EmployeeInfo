@@ -130,7 +130,7 @@ function App() {
   };
 
   return (
-    <div className="container py-5" style={{ minHeight: '100vh', backgroundColor: '#f4f7fa' }}>
+    <div className="py-5" style={{ minHeight: '100vh', backgroundColor: '#f4f7fa', padding: '48px' }}>
       <h1 className="text-center mb-4">Employee Manager</h1>
 
       <EmployeeForm
