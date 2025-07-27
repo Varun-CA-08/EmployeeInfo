@@ -1,23 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { getTodos, addTodo, updateTodo, deleteTodo } from './services/todoService';
+import {
+  getEmployees,
+  getEmployeeById,
+  addEmployee,
+  updateEmployee,
+  deleteEmployee
+} from './services/employeeService.js';
 import Swal from 'sweetalert2';
 
+import EmployeeForm from './components/EmployeeForm.jsx';
+import EmployeeSearch from './components/EmployeeSearch.jsx';
+import EmployeeTable from './components/EmployeeTable.jsx';
+
 function App() {
-  const [todos, setTodos] = useState([]);
-  const [title, setTitle] = useState('');
+  const [employees, setEmployees] = useState([]);
+  const [form, setForm] = useState({ name: '', email: '', department: '' });
   const [editData, setEditData] = useState(null);
+  const [searchId, setSearchId] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    fetchTodos();
+    fetchEmployees();
   }, []);
 
-  const fetchTodos = async () => {
+  const fetchEmployees = async () => {
     try {
-      const response = await getTodos();
+      const response = await getEmployees();
       if (response.status !== 200) throw new Error();
-
-      const data = response.data.filter((item) => item && item.title?.trim());
-      setTodos(data || []);
+      const data = response.data.filter(emp => emp && emp.name?.trim());
+      setEmployees(data || []);
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -29,33 +40,31 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
-
-    const todo = {
-      title: title.trim(),
-      completed: false,
-    };
+    const { name, email, department } = form;
+    if (!name || !email || !department) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'All fields are required',
+      });
+    }
 
     try {
-      let response;
+      const response = editData
+        ? await updateEmployee(editData.id, { name, email, department })
+        : await addEmployee({ name, email, department });
 
-      if (editData) {
-        response = await updateTodo({ ...editData, title: todo.title });
-      } else {
-        response = await addTodo(todo);
-      }
-
-      if (response.status !== 200 && response.status !== 201) throw new Error();
+      if (![200, 201].includes(response.status)) throw new Error();
 
       Swal.fire({
         icon: 'success',
         title: 'Success',
-        text: `Todo ${editData ? 'updated' : 'added'} successfully!`,
+        text: `Employee ${editData ? 'updated' : 'added'} successfully!`,
       });
 
-      setTitle('');
+      setForm({ name: '', email: '', department: '' });
       setEditData(null);
-      fetchTodos();
+      fetchEmployees();
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -65,23 +74,27 @@ function App() {
     }
   };
 
-  const handleEdit = (todo) => {
-    setEditData(todo);
-    setTitle(todo.title);
+  const handleEdit = (emp) => {
+    setEditData(emp);
+    setForm({
+      name: emp.name,
+      email: emp.email,
+      department: emp.department,
+    });
   };
 
-  const handleDelete = async (todo) => {
+  const handleDelete = async (emp) => {
     try {
-      const response = await deleteTodo(todo.id);
+      const response = await deleteEmployee(emp.id);
       if (response.status !== 200) throw new Error();
 
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: 'Todo deleted successfully!',
+        title: 'Deleted',
+        text: 'Employee deleted successfully!',
       });
 
-      fetchTodos();
+      fetchEmployees();
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -91,70 +104,59 @@ function App() {
     }
   };
 
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchId.trim()) return;
+    setIsSearching(true);
+
+    try {
+      const response = await getEmployeeById(searchId);
+      if (response.status !== 200) throw new Error();
+      setEmployees([response.data]);
+    } catch {
+      setEmployees([]);
+      Swal.fire({
+        icon: 'info',
+        title: 'Not Found',
+        text: `No employee found with ID ${searchId}`,
+      });
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchId('');
+    setIsSearching(false);
+    fetchEmployees();
+  };
+
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Add Details</h1>
+    <div className="container py-5" style={{ minHeight: '100vh', backgroundColor: '#f4f7fa' }}>
+      <h1 className="text-center mb-4">Employee Manager</h1>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
-        <input
-          type="text"
-          value={title}
-          placeholder="Enter todo title"
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <button type="submit" style={{ marginLeft: '10px' }}>
-          {editData ? 'Update' : 'Add'}
-        </button>
-      </form>
+      <EmployeeForm
+        form={form}
+        editData={editData}
+        handleChange={(e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))}
+        handleSubmit={handleSubmit}
+        onCancel={() => {
+          setForm({ name: '', email: '', department: '' });
+          setEditData(null);
+        }}
+      />
 
-      <table border="1" cellPadding="10" style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Title</th>
-            <th>Completed</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {todos.length === 0 ? (
-            <tr>
-              <td colSpan="4" style={{ textAlign: 'center' }}>
-                No todos found
-              </td>
-            </tr>
-          ) : (
-            todos.map((todo) => (
-              <tr key={todo.id}>
-                <td>{todo.id}</td>
-                <td>{todo.title}</td>
-                <td>{todo.completed ? 'Yes' : 'No'}</td>
-                <td>
-                  <button onClick={() => handleEdit(todo)}>Edit</button>
-                  <button
-                    onClick={() =>
-                      Swal.fire({
-                        title: 'Are you sure?',
-                        text: 'This will delete the todo.',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33',
-                        confirmButtonText: 'Yes, delete it!',
-                      }).then((result) => {
-                        if (result.isConfirmed) handleDelete(todo);
-                      })
-                    }
-                    style={{ marginLeft: '10px' }}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      <EmployeeSearch
+        searchId={searchId}
+        onChange={(e) => setSearchId(e.target.value)}
+        onSearch={handleSearch}
+        onClear={clearSearch}
+        isSearching={isSearching}
+      />
+
+      <EmployeeTable
+        employees={employees}
+        handleEdit={handleEdit}
+        handleDelete={handleDelete}
+      />
     </div>
   );
 }
