@@ -12,7 +12,7 @@ router.post('/addTodo', addTodo);
 router.delete('/deleteTodo/:id', deleteTodo);
 
 //update todo
-router.put('/updateTodo/:id', updateTodo);
+router.put('/updateTodo', updateTodo);
 
 export const todoRoute = router;
 // export default router;
